@@ -133,4 +133,5 @@ dmypy.json
 
 # Data
 data/
+!model/data/
 save/
