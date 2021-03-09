@@ -48,11 +48,11 @@ class ComposeFANInput:
 
         dsize = (self.size[0], self.size[1])
         image1 = cv.resize(img, dsize)
-        mask1 = cv.resize(mask1.astype(np.float32), dsize).astype(np.bool8)
+        mask1 = cv.resize(mask1, dsize).astype(np.bool8)
 
         dsize = (self.size[0]//self.portrait_scale, self.size[0]//self.portrait_scale)
         image2 = cv.resize(portrait, dsize)
-        mask2 = cv.resize(mask2.astype(np.float32), dsize).astype(np.bool8)
+        mask2 = cv.resize(mask2, dsize).astype(np.bool8)
 
         image2 = np.array(Image.fromarray(image2).convert('LA'))[:, :, 0]
         image2 = np.stack((image2,) * 3, axis=-1)
@@ -87,7 +87,7 @@ class ComposeFANInput:
 
     @staticmethod
     def disk(width, height, x, y, radius):
-        surface = cairo.ImageSurface(cairo.FORMAT_A8, width, height)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height) # A8
         cr = cairo.Context(surface)
         cr.scale(width, height)
         cr.set_source_rgba(0, 0, 0, 0)
@@ -97,7 +97,7 @@ class ComposeFANInput:
         cr.arc(x, y, radius, 0, 2 * pi)
         cr.fill()
         buf = surface.get_data()
-        data = np.ndarray(shape=(width, height), dtype=np.dtype('>b1'), buffer=buf)
+        data = np.ndarray(shape=(width, height), dtype=np.float32, buffer=buf) # np.dtype('>b1')
         return data
 
 
