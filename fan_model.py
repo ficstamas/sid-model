@@ -12,14 +12,22 @@ import numpy as np
 ds = MillionFacesDataset("data/million/")
 augmented = FANDataset(ds, transform=ComposeFANPortrait(25, 0.8, 0.5))
 
-# resnet = torchvision.models.resnet18(pretrained=True)
+resnet = torchvision.models.resnet18(pretrained=True)
 
 fpn = FPN(Bottleneck, [2, 2, 2, 2])
-
+fan = FAN()
+FAN_reg = FANRegression()
 dataloader = DataLoader(augmented, 16, True)
 
 for data in dataloader:
     fpn.train()
+    fan.train()
+    resnet.eval()
+
     x = data[0]
-    x = fpn(x)
-    y = x
+    features = fpn(x)
+    attention = fan(features)
+    cls = resnet(attention[0])
+
+    cls2 = FAN_reg(cls)
+    print("")

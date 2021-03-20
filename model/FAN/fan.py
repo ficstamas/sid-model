@@ -2,6 +2,40 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class FANRegression(nn.Module):
+    def __init__(self):
+        super(FANRegression, self).__init__()
+        self.linear1 = nn.Linear(1000, 256)
+        self.linear2 = nn.Linear(256, 256)
+        self.linear3 = nn.Linear(256, 2)
+
+    def forward(self, x):
+        a = F.relu(self.linear1(x), inplace=True)
+        a = F.relu(self.linear2(a), inplace=True)
+        return F.sigmoid(self.linear3(a))
+
+
+class FAN(nn.Module):
+    def __init__(self, feature_levels=4):
+        super(FAN, self).__init__()
+        self.levels = feature_levels
+
+        self.conv1 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(256, 1, kernel_size=3, stride=1, padding=1)
+        self.conv_out = nn.Conv2d(256, 3, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, x):
+        out = []
+        for T in x:
+            a = self.conv1(T)
+            b = self.conv2(a)
+            c = self.conv3(b)
+            o = T + F.sigmoid(c)
+            out.append(self.conv_out(o))
+        return out
+
+
 class FPN(nn.Module):
     def __init__(self, block, num_blocks):
         super(FPN, self).__init__()
