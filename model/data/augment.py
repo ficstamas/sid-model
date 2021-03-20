@@ -83,7 +83,7 @@ class ComposeFANInput:
         mask[random_position[0]:random_position[0]+image2.shape[0],
              random_position[1]:random_position[1]+image2.shape[1]] |= mask2[:, :]
 
-        return bg, mask
+        return ToTensor()(bg / 255, mask)
 
     @staticmethod
     def disk(width, height, x, y, radius):
@@ -320,11 +320,11 @@ class RandomCrop:
 class ToTensor:
     """Convert ndarrays in sample to Tensors."""
 
-    def __call__(self, sample):
+    def __call__(self, sample, mask):
         image = sample
 
         # swap color axis because
         # numpy image: H x W x C
         # torch image: C X H X W
         image = image.transpose((2, 0, 1))
-        return torch.from_numpy(image)
+        return torch.from_numpy(image).float(), torch.from_numpy(mask)
