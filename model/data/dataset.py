@@ -41,19 +41,28 @@ class FANDataset(Dataset):
             index = index.tolist()
 
         sample = self.dataset[index]
+        r = np.random.random(1)
+        label = True
+
+        if r < self.p:
+            ridx = np.random.randint(0, high=len(self))
+            portrait = self.dataset[ridx]
+            label = index == ridx
+        else:
+            portrait = self.dataset[index]
 
         compose = ComposeFANInput(self.size, self.portrait_scale, self.transform)
-        image, mask = compose(sample, sample)
-        return image, mask
+        image, mask = compose(sample, portrait)
+        return image, mask, torch.BoolTensor([label])
 
     def __len__(self):
         return self.dataset.__len__()
 
-    def __init__(self, dataset: MillionFacesDataset, size=(512, 512), portrait_scale=8, transform=None):
+    def __init__(self, dataset: MillionFacesDataset, size=(512, 512), portrait_scale=8, transform=None, p=0.5):
         super(FANDataset, self).__init__()
         self.dataset = dataset
         self.transform = transform
         self.size = size
         self.portrait_scale = portrait_scale
-
+        self.p = p
 

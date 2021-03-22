@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
 
 class FANRegression(nn.Module):
@@ -12,7 +13,7 @@ class FANRegression(nn.Module):
     def forward(self, x):
         a = F.relu(self.linear1(x), inplace=True)
         a = F.relu(self.linear2(a), inplace=True)
-        return F.sigmoid(self.linear3(a))
+        return F.softmax(self.linear3(a), dim=1)
 
 
 class FAN(nn.Module):
@@ -27,13 +28,15 @@ class FAN(nn.Module):
 
     def forward(self, x):
         out = []
+        att = []
         for T in x:
             a = self.conv1(T)
             b = self.conv2(a)
             c = self.conv3(b)
-            o = T + F.sigmoid(c)
+            o = T + torch.sigmoid(c)
             out.append(self.conv_out(o))
-        return out
+            att.append(c)
+        return out, att
 
 
 class FPN(nn.Module):
@@ -87,8 +90,8 @@ class FPN(nn.Module):
         upsampled feature map size: [N,_,16,16]
         So we choose bilinear upsample which supports arbitrary output sizes.
         '''
-        _,_,H,W = y.size()
-        return F.upsample(x, size=(H,W), mode='bilinear') + y
+        _, _, H, W = y.size()
+        return F.interpolate(x, size=(H, W), mode='bilinear', align_corners=True) + y
 
     def forward(self, x):
         # Bottom-up
