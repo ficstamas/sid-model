@@ -21,12 +21,12 @@ augmented_test = FANDataset(test, transform=ComposeFANPortrait(25, 0.8, 0.5))
 dataloader_test = DataLoader(augmented_test, 16, True)
 
 
-resnet = torchvision.models.resnet18(pretrained=True)
+# resnet = torchvision.models.resnet18(pretrained=True)
 
 fpn = FPN(Bottleneck, [2, 2, 2, 2])
 fan = FAN()
-FAN_reg = FANRegression()
-resnet.eval()
+# FAN_reg = FANRegression()
+# resnet.eval()
 
 criterion = torch.nn.BCEWithLogitsLoss()
 optimizer = SGD(fpn.parameters(), lr=0.01, momentum=0.9)
@@ -70,3 +70,5 @@ for epoch in tqdm.trange(100, desc="Epoch"):
             loss = attention_loss(mask, attention, criterion)
             test_loss.append(loss.detach().numpy())
         print("Test loss", np.average(test_loss))
+    torch.save(fpn, "data/model/fpn.pt")
+    torch.save(fan, "data/model/fan.pt")
