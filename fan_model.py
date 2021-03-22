@@ -1,6 +1,5 @@
 from model.data.dataset import MillionFacesDataset, FANDataset
 from model.data.augment import ComposeFANPortrait
-import torchvision
 from torch.utils.data import DataLoader
 from model.FAN.fan import *
 from model.FAN.loss import attention_loss
@@ -8,6 +7,8 @@ from torch.optim import SGD
 import tqdm
 import torch
 import numpy as np
+
+device = torch.device("cpu")  # "cuda" if torch.cuda.is_available() else
 
 # 512 x 512 input size
 
@@ -23,8 +24,8 @@ dataloader_test = DataLoader(augmented_test, 16, True)
 
 # resnet = torchvision.models.resnet18(pretrained=True)
 
-fpn = FPN(Bottleneck, [2, 2, 2, 2])
-fan = FAN()
+fpn = FPN(Bottleneck, [2, 2, 2, 2]).to(device)
+fan = FAN().to(device)
 # FAN_reg = FANRegression()
 # resnet.eval()
 
@@ -39,9 +40,9 @@ for epoch in tqdm.trange(100, desc="Epoch"):
     fpn.train()
     fan.train()
     for data in tqdm.tqdm(dataloader, desc="Train"):
-        image = data[0]
-        mask = data[1]
-        label = data[2]
+        image = data[0].to(device)
+        mask = data[1].to(device)
+        label = data[2].to(device)
 
         features = fpn(image)
         out, attention = fan(features)
