@@ -7,69 +7,78 @@ from torch.optim import SGD
 import tqdm
 import torch
 import numpy as np
+from sklearn.metrics import f1_score
+import json
 
-device = torch.device("cpu")  # "cuda" if torch.cuda.is_available() else
+import os
+
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")  # "cuda:1" if torch.cuda.is_available() else
 
 # 512 x 512 input size
 
+prefix = "/data/takacse/fan/"
+train_data_path = f"{prefix}/train/"
+test_data_path = f"{prefix}/test/"
+epochs = 100
+
+# create dirs
+
+os.makedirs(os.path.join(prefix, "model"), exist_ok=True)
+
 # Data Train
-train = MillionFacesDataset("data/million/")
+train = MillionFacesDataset(train_data_path)
 augmented = FANDataset(train, transform=ComposeFANPortrait(25, 0.8, 0.5))
 dataloader = DataLoader(augmented, 16, True)
 # Data Test
-test = MillionFacesDataset("data/test/")
+test = MillionFacesDataset(test_data_path)
 augmented_test = FANDataset(test, transform=ComposeFANPortrait(25, 0.8, 0.5))
 dataloader_test = DataLoader(augmented_test, 16, True)
 
 
-# resnet = torchvision.models.resnet18(pretrained=True)
-
 fpn = FPN(Bottleneck, [2, 2, 2, 2]).to(device)
-fan = FAN().to(device)
-# FAN_reg = FANRegression()
-# resnet.eval()
+FAN_reg = FANRegression().to(device)
+fan = FAN(fpn, FAN_reg).to(device)
 
 criterion = torch.nn.BCEWithLogitsLoss()
-optimizer = SGD(fpn.parameters(), lr=0.01, momentum=0.9)
-optimizer2 = SGD(fan.parameters(), lr=0.01, momentum=0.9)
-# criterion = MSELoss()
-# cls = resnet(out[0])
-# cls2 = FAN_reg(cls)
+optimizer = SGD(fan.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-5)
 
-for epoch in tqdm.trange(100, desc="Epoch"):
+reg_loss = nn.BCELoss()
+
+epoch_data = {"train_loss": [], "test_score": []}
+
+for epoch in tqdm.trange(epochs, desc="Epoch"):
     fpn.train()
     fan.train()
+    train_loss = []
     for data in tqdm.tqdm(dataloader, desc="Train"):
         image = data[0].to(device)
         mask = data[1].to(device)
         label = data[2].to(device)
 
-        features = fpn(image)
-        out, attention = fan(features)
-        loss = attention_loss(mask, attention, criterion)
-
+        out, attention, prediction = fan(image)
+        loss = attention_loss(mask, attention, criterion) + reg_loss(torch.argmax(prediction, dim=1).float(), label.resize(16).float())
+        train_loss.append(loss)
         optimizer.zero_grad()
-        optimizer2.zero_grad()
-
         loss.backward()
-
         optimizer.step()
-        optimizer2.step()
+    epoch_data["train_loss"].append(train_loss)
 
-    fpn.eval()
     fan.eval()
 
     with torch.no_grad():
-        test_loss = []
+        test_predictions = np.array([])
+        test_labels = np.array([])
         for data in tqdm.tqdm(dataloader_test, desc="Test"):
             image = data[0]
             mask = data[1]
-            label = data[2]
+            label = data[2].resize(16).long()
 
-            features = fpn(image)
-            out, attention = fan(features)
-            loss = attention_loss(mask, attention, criterion)
-            test_loss.append(loss.detach().numpy())
-        print("Test loss", np.average(test_loss))
-    torch.save(fpn, "data/model/fpn.pt")
-    torch.save(fan, "data/model/fan.pt")
+            out, attention, prediction = fan(image)
+            pred = torch.argmax(prediction, dim=1).long()
+            test_score = np.concatenate([test_score, pred])
+            test_labels = np.concatenate([test_labels, label])
+        epoch_data["test_score"].append(f1_score(test_labels, test_predictions))
+
+    torch.save(fan, f"{prefix}model/fan_{epoch}.pt")
+    with open(f"{prefix}model/epochs.json", mode="w", encoding="utf8") as f:
+        json.dump(epoch_data, f)

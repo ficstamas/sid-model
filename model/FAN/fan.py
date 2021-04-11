@@ -1,12 +1,13 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
+from torch.nn.functional import interpolate
 
 
 class FANRegression(nn.Module):
     def __init__(self):
         super(FANRegression, self).__init__()
-        self.linear1 = nn.Linear(1000, 256)
+        self.linear1 = nn.Linear(49152, 256)
         self.linear2 = nn.Linear(256, 256)
         self.linear3 = nn.Linear(256, 2)
 
@@ -17,26 +18,38 @@ class FANRegression(nn.Module):
 
 
 class FAN(nn.Module):
-    def __init__(self, feature_levels=4):
+    def __init__(self, fpn, regression, feature_levels=4):
         super(FAN, self).__init__()
         self.levels = feature_levels
+
+        self.fpn = fpn
+        self.regression = regression
 
         self.conv1 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(256, 1, kernel_size=3, stride=1, padding=1)
         self.conv_out = nn.Conv2d(256, 3, kernel_size=3, stride=1, padding=1)
+        self.flatten = torch.nn.Flatten()
 
     def forward(self, x):
+        features = self.fpn(x)
         out = []
         att = []
-        for T in x:
+        for T in features:
             a = self.conv1(T)
             b = self.conv2(a)
             c = self.conv3(b)
-            o = T + torch.sigmoid(c)
+            o = T * torch.exp(c)
             out.append(self.conv_out(o))
             att.append(c)
-        return out, att
+
+        overall = torch.zeros((16, 3, 128, 128))
+        for representation in out:
+            overall += interpolate(representation, size=[128, 128], mode="nearest")
+
+        regression = self.regression(self.flatten(overall))
+
+        return out, att, regression
 
 
 class FPN(nn.Module):
