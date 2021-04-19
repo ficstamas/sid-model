@@ -25,60 +25,61 @@ epochs = 100
 
 os.makedirs(os.path.join(prefix, "model"), exist_ok=True)
 
-# Data Train
-train = MillionFacesDataset(train_data_path)
-augmented = FANDataset(train, transform=ComposeFANPortrait(25, 0.8, 0.5))
-dataloader = DataLoader(augmented, 16, True)
-# Data Test
-test = MillionFacesDataset(test_data_path)
-augmented_test = FANDataset(test, transform=ComposeFANPortrait(25, 0.8, 0.5))
-dataloader_test = DataLoader(augmented_test, 16, True)
+with torch.cuda.device(1):
+    # Data Train
+    train = MillionFacesDataset(train_data_path)
+    augmented = FANDataset(train, transform=ComposeFANPortrait(25, 0.8, 0.5))
+    dataloader = DataLoader(augmented, 16, True)
+    # Data Test
+    test = MillionFacesDataset(test_data_path)
+    augmented_test = FANDataset(test, transform=ComposeFANPortrait(25, 0.8, 0.5))
+    dataloader_test = DataLoader(augmented_test, 16, True)
 
 
-fpn = FPN(Bottleneck, [2, 2, 2, 2]).to(device)
-FAN_reg = FANRegression().to(device)
-fan = FAN(fpn, FAN_reg).to(device)
+    fpn = FPN(Bottleneck, [2, 2, 2, 2])
+    FAN_reg = FANRegression()
+    fan = FAN(fpn, FAN_reg)
 
-criterion = torch.nn.BCEWithLogitsLoss()
-optimizer = SGD(fan.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-5)
+    criterion = torch.nn.BCEWithLogitsLoss()
+    optimizer = SGD(fan.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-5)
 
-reg_loss = nn.BCELoss()
+    reg_loss = nn.BCELoss()
 
-epoch_data = {"train_loss": [], "test_score": []}
+    epoch_data = {"train_loss": [], "test_score": []}
 
-for epoch in tqdm.trange(epochs, desc="Epoch"):
-    fpn.train()
-    fan.train()
-    train_loss = []
-    for data in tqdm.tqdm(dataloader, desc="Train"):
-        image = data[0].to(device)
-        mask = data[1].to(device)
-        label = data[2].to(device)
-
-        out, attention, prediction = fan(image)
-        loss = attention_loss(mask, attention, criterion) + reg_loss(torch.argmax(prediction, dim=1).float(), label.resize(16).float())
-        train_loss.append(loss)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    epoch_data["train_loss"].append(train_loss)
-
-    fan.eval()
-
-    with torch.no_grad():
-        test_predictions = np.array([])
-        test_labels = np.array([])
-        for data in tqdm.tqdm(dataloader_test, desc="Test"):
+    for epoch in tqdm.trange(epochs, desc="Epoch"):
+        fpn.train()
+        fan.train()
+        train_loss = []
+        for data in tqdm.tqdm(dataloader, desc="Train"):
             image = data[0]
             mask = data[1]
-            label = data[2].resize(16).long()
+            label = data[2]
 
             out, attention, prediction = fan(image)
-            pred = torch.argmax(prediction, dim=1).long()
-            test_score = np.concatenate([test_score, pred])
-            test_labels = np.concatenate([test_labels, label])
-        epoch_data["test_score"].append(f1_score(test_labels, test_predictions))
+            loss = attention_loss(mask, attention, criterion) + reg_loss(torch.argmax(prediction, dim=1).float(), label.resize(16).float())
+            train_loss.append(loss)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        epoch_data["train_loss"].append(train_loss)
 
-    torch.save(fan, f"{prefix}model/fan_{epoch}.pt")
-    with open(f"{prefix}model/epochs.json", mode="w", encoding="utf8") as f:
-        json.dump(epoch_data, f)
+        fan.eval()
+
+        with torch.no_grad():
+            test_predictions = np.array([])
+            test_labels = np.array([])
+            for data in tqdm.tqdm(dataloader_test, desc="Test"):
+                image = data[0]
+                mask = data[1]
+                label = data[2].resize(16).long()
+
+                out, attention, prediction = fan(image)
+                pred = torch.argmax(prediction, dim=1).long()
+                test_score = np.concatenate([test_score, pred])
+                test_labels = np.concatenate([test_labels, label])
+            epoch_data["test_score"].append(f1_score(test_labels, test_predictions))
+
+        torch.save(fan, f"{prefix}model/fan_{epoch}.pt")
+        with open(f"{prefix}model/epochs.json", mode="w", encoding="utf8") as f:
+            json.dump(epoch_data, f)
