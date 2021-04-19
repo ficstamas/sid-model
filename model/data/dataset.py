@@ -40,16 +40,25 @@ class FANDataset(Dataset):
         if torch.is_tensor(index):
             index = index.tolist()
 
-        sample = self.dataset[index]
         r = np.random.random(1)
         label = True
+        while True:
+            sample = self.dataset[index]
 
-        if r < self.p:
-            ridx = np.random.randint(0, high=len(self))
-            portrait = self.dataset[ridx]
-            label = index == ridx
-        else:
-            portrait = self.dataset[index]
+            if sample.shape.__len__() != 0:
+                break
+            index = np.random.randint(0, high=len(self))
+
+        while True:
+            if r < self.p:
+                ridx = np.random.randint(0, high=len(self))
+                portrait = self.dataset[ridx]
+                label = index == ridx
+            else:
+                portrait = self.dataset[index]
+
+            if portrait.shape.__len__() != 0:
+                break
 
         compose = ComposeFANInput(self.size, self.portrait_scale, self.transform)
         image, mask = compose(sample, portrait)
