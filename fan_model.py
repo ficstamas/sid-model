@@ -25,7 +25,7 @@ epochs = 100
 
 os.makedirs(os.path.join(prefix, "model"), exist_ok=True)
 
-with torch.cuda.device(1):
+with torch.cuda.device(1) as d:
     # Data Train
     train = MillionFacesDataset(train_data_path)
     augmented = FANDataset(train, transform=ComposeFANPortrait(25, 0.8, 0.5))
@@ -35,15 +35,14 @@ with torch.cuda.device(1):
     augmented_test = FANDataset(test, transform=ComposeFANPortrait(25, 0.8, 0.5))
     dataloader_test = DataLoader(augmented_test, 16, True)
 
+    fpn = FPN(Bottleneck, [2, 2, 2, 2]).cuda(d)
+    FAN_reg = FANRegression().cuda(d)
+    fan = FAN(fpn, FAN_reg).cuda(d)
 
-    fpn = FPN(Bottleneck, [2, 2, 2, 2])
-    FAN_reg = FANRegression()
-    fan = FAN(fpn, FAN_reg)
-
-    criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = torch.nn.BCEWithLogitsLoss().cuda(d)
     optimizer = SGD(fan.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-5)
 
-    reg_loss = nn.BCELoss()
+    reg_loss = nn.BCELoss().cuda(d)
 
     epoch_data = {"train_loss": [], "test_score": []}
 
@@ -52,9 +51,9 @@ with torch.cuda.device(1):
         fan.train()
         train_loss = []
         for data in tqdm.tqdm(dataloader, desc="Train"):
-            image = data[0]
-            mask = data[1]
-            label = data[2]
+            image = data[0].cuda(d)
+            mask = data[1].cuda(d)
+            label = data[2].cuda(d)
 
             out, attention, prediction = fan(image)
             loss = attention_loss(mask, attention, criterion) + reg_loss(torch.argmax(prediction, dim=1).float(), label.resize(16).float())
@@ -70,9 +69,9 @@ with torch.cuda.device(1):
             test_predictions = np.array([])
             test_labels = np.array([])
             for data in tqdm.tqdm(dataloader_test, desc="Test"):
-                image = data[0]
-                mask = data[1]
-                label = data[2].resize(16).long()
+                image = data[0].cuda(d)
+                mask = data[1].cuda(d)
+                label = data[2].resize(16).long().cuda(d)
 
                 out, attention, prediction = fan(image)
                 pred = torch.argmax(prediction, dim=1).long()
