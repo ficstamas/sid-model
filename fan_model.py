@@ -75,7 +75,7 @@ with torch.cuda.device(1) as d:
 
                 out, attention, prediction = fan(image)
                 pred = torch.argmax(prediction, dim=1).long()
-                test_score = np.concatenate([test_score, pred])
+                test_score = np.concatenate([test_predictions, pred])
                 test_labels = np.concatenate([test_labels, label])
             epoch_data["test_score"].append(f1_score(test_labels, test_predictions))
 
