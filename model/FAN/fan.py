@@ -43,7 +43,7 @@ class FAN(nn.Module):
             out.append(self.conv_out(o))
             att.append(c)
 
-        overall = torch.zeros((16, 3, 128, 128))
+        overall = torch.zeros((16, 3, 128, 128)).to("cuda:2")
         for representation in out:
             overall += interpolate(representation, size=[128, 128], mode="nearest")
 

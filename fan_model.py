@@ -12,7 +12,7 @@ import json
 
 import os
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")  # "cuda:1" if torch.cuda.is_available() else
+device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")  # "cuda:1" if torch.cuda.is_available() else
 
 # 512 x 512 input size
 
@@ -25,7 +25,7 @@ epochs = 100
 
 os.makedirs(os.path.join(prefix, "model"), exist_ok=True)
 
-with torch.cuda.device(1) as d:
+with torch.cuda.device(2) as d:
     # Data Train
     train = MillionFacesDataset(train_data_path)
     augmented = FANDataset(train, transform=ComposeFANPortrait(25, 0.8, 0.5))
@@ -75,7 +75,7 @@ with torch.cuda.device(1) as d:
 
                 out, attention, prediction = fan(image)
                 pred = torch.argmax(prediction, dim=1).long()
-                test_score = np.concatenate([test_predictions, pred.cpu().numpy()])
+                test_predictions = np.concatenate([test_predictions, pred.cpu().numpy()])
                 test_labels = np.concatenate([test_labels, label.cpu().numpy()])
             epoch_data["test_score"].append(f1_score(test_labels, test_predictions))
 
